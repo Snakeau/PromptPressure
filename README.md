@@ -94,7 +94,7 @@ promptpressure scan \
   "timestamp": "2026-04-08T11:00:00+00:00",
   "target": { "url": "http://localhost:8010" },
   "mode": "quick_check",
-  "scanner_version": "0.1.0",
+  "scanner_version": "0.1.1",
   "summary": {
     "score": 25,
     "badge": "critical_risk",
