@@ -36,7 +36,10 @@ dev = [
 promptpressure = "promptpressure.cli:app"
 
 [project.urls]
+Homepage = "https://github.com/Snakeau/PromptPressure"
 Repository = "https://github.com/Snakeau/PromptPressure"
+Issues = "https://github.com/Snakeau/PromptPressure/issues"
+Changelog = "https://github.com/Snakeau/PromptPressure/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["promptpressure"]

@@ -5,6 +5,9 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
+[![PyPI version](https://badge.fury.io/py/promptpressure.svg)](https://pypi.org/project/promptpressure/)
+[![Downloads](https://pepy.tech/badge/promptpressure)](https://pepy.tech/project/promptpressure)
+[![Tests](https://github.com/Snakeau/PromptPressure/actions/workflows/test.yml/badge.svg)](https://github.com/Snakeau/PromptPressure/actions/workflows/test.yml)
 
 PromptPressure runs automated adversarial scenarios against any OpenAI-compatible AI endpoint
 and produces a scored security report — no backend required, works entirely locally.
@@ -16,8 +19,13 @@ and produces a scored security report — no backend required, works entirely lo
 ### Install
 
 ```bash
+# Recommended for CLI tools (isolated environment)
+pipx install promptpressure
+
+# Or with pip
 pip install promptpressure
-# or from source:
+
+# Or from source
 pip install -e .
 ```
 
@@ -221,12 +229,18 @@ tests/                  # pytest test suite
 
 ---
 
+## Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## Security
+
+Found a vulnerability? Please report it responsibly — see [SECURITY.md](SECURITY.md).
+
 ## License
 
-MIT – see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).
 
 ---
-
-## Topics
 
 `ai-security` · `red-teaming` · `prompt-injection` · `llm-security` · `ai-red-team` · `devsecops` · `compliance`
