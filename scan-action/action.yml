@@ -1,0 +1,106 @@
+name: 'PromptPressure Scan'
+description: 'Run an automated AI red-team scan against an OpenAI-compatible endpoint.'
+author: 'Snakeau'
+
+branding:
+  icon: 'shield'
+  color: 'red'
+
+inputs:
+  url:
+    description: 'Target URL – base URL of the OpenAI-compatible endpoint.'
+    required: true
+  mode:
+    description: 'Scan mode: quick_check | full | pi_suite | sp_suite | dx_suite | ta_suite'
+    default: 'quick_check'
+  output-json:
+    description: 'Path where JSON results will be written.'
+    default: 'promptpressure-results.json'
+  fail-on:
+    description: 'Fail the step if any finding meets or exceeds this severity: none | low | medium | high | critical'
+    default: 'high'
+  auth-header:
+    description: 'Authorization header value, e.g. "Authorization: Bearer sk-..."'
+    required: false
+    default: ''
+  extra-headers:
+    description: 'Additional headers, one per line in "Key: Value" format.'
+    required: false
+    default: ''
+  python-version:
+    description: 'Python version to use.'
+    default: '3.11'
+
+outputs:
+  score:
+    description: 'Overall security score (0–100).'
+    value: ${{ steps.parse.outputs.score }}
+  badge:
+    description: 'Score badge label: secure | needs_attention | vulnerable | critical_risk'
+    value: ${{ steps.parse.outputs.badge }}
+  findings-count:
+    description: 'Total number of findings.'
+    value: ${{ steps.parse.outputs.findings_count }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install PromptPressure
+      shell: bash
+      run: |
+        pip install --quiet "${{ github.action_path }}/.."
+
+    - name: Build scan arguments
+      id: args
+      shell: bash
+      run: |
+        ARGS="--url '${{ inputs.url }}' --mode '${{ inputs.mode }}'"
+        ARGS="$ARGS --output-json '${{ inputs.output-json }}'"
+        ARGS="$ARGS --fail-on '${{ inputs.fail-on }}'"
+
+        if [ -n "${{ inputs.auth-header }}" ]; then
+          ARGS="$ARGS --auth-header '${{ inputs.auth-header }}'"
+        fi
+
+        # Extra headers: one per line
+        while IFS= read -r hdr; do
+          [ -n "$hdr" ] && ARGS="$ARGS --header '$hdr'"
+        done <<< "${{ inputs.extra-headers }}"
+
+        echo "scan_args=$ARGS" >> "$GITHUB_OUTPUT"
+
+    - name: Run PromptPressure scan
+      shell: bash
+      run: |
+        eval promptpressure scan ${{ steps.args.outputs.scan_args }}
+
+    - name: Parse results
+      id: parse
+      if: always()
+      shell: bash
+      run: |
+        if [ -f "${{ inputs.output-json }}" ]; then
+          SCORE=$(python3 -c "import json,sys; d=json.load(open('${{ inputs.output-json }}')); print(d['summary']['score'])")
+          BADGE=$(python3 -c "import json,sys; d=json.load(open('${{ inputs.output-json }}')); print(d['summary']['badge'])")
+          COUNT=$(python3 -c "import json,sys; d=json.load(open('${{ inputs.output-json }}')); print(d['summary']['findings_total'])")
+        else
+          SCORE="N/A"
+          BADGE="unknown"
+          COUNT="0"
+        fi
+        echo "score=$SCORE"    >> "$GITHUB_OUTPUT"
+        echo "badge=$BADGE"    >> "$GITHUB_OUTPUT"
+        echo "findings_count=$COUNT" >> "$GITHUB_OUTPUT"
+
+    - name: Upload scan results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: promptpressure-results
+        path: ${{ inputs.output-json }}
+        if-no-files-found: warn
