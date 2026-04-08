@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import json
+import os
+import socket
 import sys
 from enum import Enum
 from pathlib import Path
 from typing import Annotated, Optional
+from urllib.parse import urlparse
 
 import typer
 from rich.console import Console
@@ -16,6 +19,7 @@ from promptpressure import __version__
 from promptpressure.core.runner import run_scan
 from promptpressure.core.schema import severity_meets_threshold
 from promptpressure.suites.registry import MODES
+from promptpressure.target.openai_like import OpenAILikeClient
 
 app = typer.Typer(
     name="promptpressure",
@@ -38,6 +42,34 @@ def _version_callback(value: bool) -> None:
     if value:
         typer.echo(f"promptpressure {__version__}")
         raise typer.Exit()
+
+
+def _parse_header(raw: str) -> tuple[str, str]:
+    key, sep, value = raw.partition(":")
+    if not sep or not key.strip() or not value.strip():
+        raise ValueError("Header must use 'Key: Value' format.")
+    return key.strip(), value.strip()
+
+
+def _check_output_path(path: Path) -> str:
+    parent = path.parent
+    if not parent.exists():
+        return f"FAIL: parent directory does not exist: {parent}"
+    if not parent.is_dir():
+        return f"FAIL: parent path is not a directory: {parent}"
+    if not parent.stat().st_mode:
+        return f"FAIL: cannot inspect output directory: {parent}"
+    if not os.access(parent, os.W_OK):
+        return f"FAIL: output directory is not writable: {parent}"
+    return f"OK: output path is writable: {path}"
+
+
+def _check_tcp_connectivity(hostname: str, port: int, timeout: int) -> str:
+    try:
+        with socket.create_connection((hostname, port), timeout=timeout):
+            return f"OK: TCP connection established to {hostname}:{port}"
+    except OSError as exc:
+        return f"FAIL: unable to connect to {hostname}:{port} ({exc})"
 
 
 @app.callback()
@@ -195,6 +227,95 @@ def list_suites() -> None:
         table.add_row(name, str(count), info["description"])
 
     console.print("\n[bold]PromptPressure – Available Suites & Modes[/bold]\n")
+    console.print(table)
+    console.print()
+
+
+# ---------------------------------------------------------------------------
+# doctor command
+# ---------------------------------------------------------------------------
+
+@app.command()
+def doctor(
+    url: Annotated[
+        Optional[str],
+        typer.Option("--url", help="Optional target base URL to validate and test connectivity."),
+    ] = None,
+    auth_header: Annotated[
+        Optional[str],
+        typer.Option("--auth-header", help='Authorization header, e.g. "Authorization: Bearer sk-..."'),
+    ] = None,
+    header: Annotated[
+        Optional[list[str]],
+        typer.Option("--header", help="Extra header in 'Key: Value' form (repeatable)."),
+    ] = None,
+    output_json: Annotated[
+        Optional[Path],
+        typer.Option("--output-json", help="Optional output path to validate for scan results."),
+    ] = None,
+    timeout: Annotated[int, typer.Option("--timeout", help="Network timeout in seconds.")] = 5,
+) -> None:
+    """Check local installation and common scan configuration problems."""
+
+    table = Table(show_header=True, header_style="bold blue")
+    table.add_column("Check", style="bold", width=24)
+    table.add_column("Result")
+
+    def add_row(name: str, result: str) -> None:
+        style = "green" if result.startswith("OK:") else "red" if result.startswith("FAIL:") else "yellow"
+        table.add_row(name, f"[{style}]{result}[/{style}]")
+
+    add_row("PromptPressure", f"OK: version {__version__}")
+    add_row("Python", f"OK: {sys.version.split()[0]}")
+
+    for package_name in ("typer", "rich", "requests"):
+        try:
+            __import__(package_name)
+            add_row(f"Dependency {package_name}", "OK: import succeeded")
+        except Exception as exc:  # pragma: no cover - import failures are environment-specific
+            add_row(f"Dependency {package_name}", f"FAIL: import failed ({exc})")
+
+    if auth_header:
+        try:
+            header_name, _ = _parse_header(auth_header)
+            add_row("Auth header", f"OK: parsed {header_name}")
+        except ValueError as exc:
+            add_row("Auth header", f"FAIL: {exc}")
+    else:
+        add_row("Auth header", "WARN: not provided")
+
+    if header:
+        for idx, raw_header in enumerate(header, start=1):
+            try:
+                header_name, _ = _parse_header(raw_header)
+                add_row(f"Extra header {idx}", f"OK: parsed {header_name}")
+            except ValueError as exc:
+                add_row(f"Extra header {idx}", f"FAIL: {exc}")
+    else:
+        add_row("Extra headers", "WARN: none provided")
+
+    if output_json:
+        add_row("Output path", _check_output_path(output_json))
+    else:
+        add_row("Output path", "WARN: not provided")
+
+    if url:
+        parsed = urlparse(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            add_row("Target URL", "FAIL: use a full http:// or https:// URL")
+        else:
+            normalized_url = OpenAILikeClient(url).url
+            add_row("Target URL", f"OK: normalized to {normalized_url}")
+            hostname = parsed.hostname
+            port = parsed.port or (443 if parsed.scheme == "https" else 80)
+            if hostname is None:
+                add_row("Connectivity", "FAIL: could not determine target host")
+            else:
+                add_row("Connectivity", _check_tcp_connectivity(hostname, port, timeout))
+    else:
+        add_row("Target URL", "WARN: not provided")
+
+    console.print("\n[bold]PromptPressure Doctor[/bold]\n")
     console.print(table)
     console.print()
 
