@@ -13,15 +13,20 @@
 set -e
 
 # Typing effect
+# Slightly irregular cadence reads more naturally than fixed delays.
 type_cmd() {
     local cmd="$1"
     echo -n "$ "
     for (( i=0; i<${#cmd}; i++ )); do
         echo -n "${cmd:$i:1}"
-        sleep 0.04
+        python3 - <<'PY'
+import random, time
+# Fast human-ish typing with mild variation.
+time.sleep(random.uniform(0.008, 0.018))
+PY
     done
     echo
-    sleep 0.3
+    sleep 0.12
 }
 
 clear
