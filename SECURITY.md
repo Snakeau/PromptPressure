@@ -12,7 +12,7 @@ If you discover a security vulnerability in PromptPressure, please report it res
 
 **Do NOT open a public GitHub issue for security vulnerabilities.**
 
-Instead, please email: **security@snakeau.com** (or open a [private security advisory](https://github.com/Snakeau/PromptPressure/security/advisories/new) on GitHub).
+Instead, please email: **hello@promptpressure.com** (or open a [private security advisory](https://github.com/Snakeau/PromptPressure/security/advisories/new) on GitHub).
 
 Include:
 - Description of the vulnerability
