@@ -144,22 +144,38 @@ def scan(
         completed += 1
         console.print(f"  [{completed:>2}/{total}] [dim]{sid}[/dim] {name}")
 
-    result = run_scan(
-        url=url,
-        mode=mode,
-        headers=extra_headers if extra_headers else None,
-        scanner_version=__version__,
-        timeout=timeout,
-        on_scenario_start=on_start,
-    )
+    result = None
+    scan_error: str | None = None
+    try:
+        result = run_scan(
+            url=url,
+            mode=mode,
+            headers=extra_headers if extra_headers else None,
+            scanner_version=__version__,
+            timeout=timeout,
+            on_scenario_start=on_start,
+        )
+    except Exception as exc:
+        scan_error = str(exc)
+        err_console.print(f"\n[red]Scan interrupted: {scan_error}[/red]")
+
+    if result is None:
+        # Build a minimal partial result so JSON is still written
+        from promptpressure.core.schema import ScanResult
+        result = ScanResult(target_url=url, mode=mode, scanner_version=__version__)
+        result.score = -1
+        result.badge = "error"
 
     # Print summary
     _print_summary(result)
 
-    # Write JSON
+    # Write JSON – always, even on partial / errored runs
     if output_json:
         output_json.write_text(json.dumps(result.to_dict(), indent=2))
         console.print(f"\n[green]Results written to[/green] {output_json}")
+
+    if scan_error:
+        raise typer.Exit(2)
 
     # Exit code
     worst = _worst_severity(result)

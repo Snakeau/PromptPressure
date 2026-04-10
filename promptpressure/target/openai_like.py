@@ -64,6 +64,10 @@ class OpenAILikeClient:
                 data = {}
         except urllib.error.URLError as exc:
             raise RuntimeError(f"Connection failed: {exc.reason}") from exc
+        except (TimeoutError, OSError) as exc:
+            raise RuntimeError(
+                f"Request timed out after {self.timeout}s: {exc}"
+            ) from exc
         except json.JSONDecodeError as exc:
             raise RuntimeError(f"Invalid JSON response: {exc}") from exc
 

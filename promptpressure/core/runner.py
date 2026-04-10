@@ -53,7 +53,7 @@ def run_scan(
 
         try:
             response_text, status_code = client.chat(prompt)
-        except RuntimeError as exc:
+        except Exception as exc:
             error = str(exc)
             response_text = ""
             status_code = 0
